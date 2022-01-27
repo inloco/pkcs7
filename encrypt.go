@@ -14,25 +14,25 @@ import (
 	"fmt"
 )
 
-type envelopedData struct {
+type EnvelopedData struct {
 	Version              int
-	RecipientInfos       []recipientInfo `asn1:"set"`
-	EncryptedContentInfo encryptedContentInfo
+	RecipientInfos       []RecipientInfo `asn1:"set"`
+	EncryptedContentInfo EncryptedContentInfo
 }
 
-type encryptedData struct {
+type EncryptedData struct {
 	Version              int
-	EncryptedContentInfo encryptedContentInfo
+	EncryptedContentInfo EncryptedContentInfo
 }
 
-type recipientInfo struct {
+type RecipientInfo struct {
 	Version                int
 	IssuerAndSerialNumber  issuerAndSerial
 	KeyEncryptionAlgorithm pkix.AlgorithmIdentifier
 	EncryptedKey           []byte
 }
 
-type encryptedContentInfo struct {
+type EncryptedContentInfo struct {
 	ContentType                asn1.ObjectIdentifier
 	ContentEncryptionAlgorithm pkix.AlgorithmIdentifier
 	EncryptedContent           asn1.RawValue `asn1:"tag:0,optional"`
@@ -77,7 +77,7 @@ type aesGCMParameters struct {
 	ICVLen int
 }
 
-func encryptAESGCM(content []byte, key []byte) ([]byte, *encryptedContentInfo, error) {
+func EncryptAESGCM(content []byte, key []byte) ([]byte, *EncryptedContentInfo, error) {
 	var keyLen int
 	var algID asn1.ObjectIdentifier
 	switch ContentEncryptionAlgorithm {
@@ -132,7 +132,7 @@ func encryptAESGCM(content []byte, key []byte) ([]byte, *encryptedContentInfo, e
 		return nil, nil, err
 	}
 
-	eci := encryptedContentInfo{
+	eci := EncryptedContentInfo{
 		ContentType: OIDData,
 		ContentEncryptionAlgorithm: pkix.AlgorithmIdentifier{
 			Algorithm: algID,
@@ -141,13 +141,13 @@ func encryptAESGCM(content []byte, key []byte) ([]byte, *encryptedContentInfo, e
 				Bytes: paramBytes,
 			},
 		},
-		EncryptedContent: marshalEncryptedContent(ciphertext),
+		EncryptedContent: MarshalEncryptedContent(ciphertext),
 	}
 
 	return key, &eci, nil
 }
 
-func encryptDESCBC(content []byte, key []byte) ([]byte, *encryptedContentInfo, error) {
+func EncryptDESCBC(content []byte, key []byte) ([]byte, *EncryptedContentInfo, error) {
 	if key == nil {
 		// Create DES key
 		key = make([]byte, 8)
@@ -171,7 +171,7 @@ func encryptDESCBC(content []byte, key []byte) ([]byte, *encryptedContentInfo, e
 		return nil, nil, err
 	}
 	mode := cipher.NewCBCEncrypter(block, iv)
-	plaintext, err := pad(content, mode.BlockSize())
+	plaintext, err := Pad(content, mode.BlockSize())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -179,19 +179,19 @@ func encryptDESCBC(content []byte, key []byte) ([]byte, *encryptedContentInfo, e
 	mode.CryptBlocks(cyphertext, plaintext)
 
 	// Prepare ASN.1 Encrypted Content Info
-	eci := encryptedContentInfo{
+	eci := EncryptedContentInfo{
 		ContentType: OIDData,
 		ContentEncryptionAlgorithm: pkix.AlgorithmIdentifier{
 			Algorithm:  OIDEncryptionAlgorithmDESCBC,
 			Parameters: asn1.RawValue{Tag: 4, Bytes: iv},
 		},
-		EncryptedContent: marshalEncryptedContent(cyphertext),
+		EncryptedContent: MarshalEncryptedContent(cyphertext),
 	}
 
 	return key, &eci, nil
 }
 
-func encryptAESCBC(content []byte, key []byte) ([]byte, *encryptedContentInfo, error) {
+func EncryptAESCBC(content []byte, key []byte) ([]byte, *EncryptedContentInfo, error) {
 	var keyLen int
 	var algID asn1.ObjectIdentifier
 	switch ContentEncryptionAlgorithm {
@@ -228,7 +228,7 @@ func encryptAESCBC(content []byte, key []byte) ([]byte, *encryptedContentInfo, e
 		return nil, nil, err
 	}
 	mode := cipher.NewCBCEncrypter(block, iv)
-	plaintext, err := pad(content, mode.BlockSize())
+	plaintext, err := Pad(content, mode.BlockSize())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -236,13 +236,13 @@ func encryptAESCBC(content []byte, key []byte) ([]byte, *encryptedContentInfo, e
 	mode.CryptBlocks(cyphertext, plaintext)
 
 	// Prepare ASN.1 Encrypted Content Info
-	eci := encryptedContentInfo{
+	eci := EncryptedContentInfo{
 		ContentType: OIDData,
 		ContentEncryptionAlgorithm: pkix.AlgorithmIdentifier{
 			Algorithm:  algID,
 			Parameters: asn1.RawValue{Tag: 4, Bytes: iv},
 		},
-		EncryptedContent: marshalEncryptedContent(cyphertext),
+		EncryptedContent: MarshalEncryptedContent(cyphertext),
 	}
 
 	return key, &eci, nil
@@ -260,22 +260,22 @@ func encryptAESCBC(content []byte, key []byte) ([]byte, *encryptedContentInfo, e
 //
 // TODO(fullsailor): Add support for encrypting content with other algorithms
 func Encrypt(content []byte, recipients []*x509.Certificate) ([]byte, error) {
-	var eci *encryptedContentInfo
+	var eci *EncryptedContentInfo
 	var key []byte
 	var err error
 
 	// Apply chosen symmetric encryption method
 	switch ContentEncryptionAlgorithm {
 	case EncryptionAlgorithmDESCBC:
-		key, eci, err = encryptDESCBC(content, nil)
+		key, eci, err = EncryptDESCBC(content, nil)
 	case EncryptionAlgorithmAES128CBC:
 		fallthrough
 	case EncryptionAlgorithmAES256CBC:
-		key, eci, err = encryptAESCBC(content, nil)
+		key, eci, err = EncryptAESCBC(content, nil)
 	case EncryptionAlgorithmAES128GCM:
 		fallthrough
 	case EncryptionAlgorithmAES256GCM:
-		key, eci, err = encryptAESGCM(content, nil)
+		key, eci, err = EncryptAESGCM(content, nil)
 
 	default:
 		return nil, ErrUnsupportedEncryptionAlgorithm
@@ -286,9 +286,9 @@ func Encrypt(content []byte, recipients []*x509.Certificate) ([]byte, error) {
 	}
 
 	// Prepare each recipient's encrypted cipher key
-	recipientInfos := make([]recipientInfo, len(recipients))
+	recipientInfos := make([]RecipientInfo, len(recipients))
 	for i, recipient := range recipients {
-		encrypted, err := encryptKey(key, recipient)
+		encrypted, err := EncryptKey(key, recipient)
 		if err != nil {
 			return nil, err
 		}
@@ -296,7 +296,7 @@ func Encrypt(content []byte, recipients []*x509.Certificate) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		info := recipientInfo{
+		info := RecipientInfo{
 			Version:               0,
 			IssuerAndSerialNumber: ias,
 			KeyEncryptionAlgorithm: pkix.AlgorithmIdentifier{
@@ -308,7 +308,7 @@ func Encrypt(content []byte, recipients []*x509.Certificate) ([]byte, error) {
 	}
 
 	// Prepare envelope content
-	envelope := envelopedData{
+	envelope := EnvelopedData{
 		EncryptedContentInfo: *eci,
 		Version:              0,
 		RecipientInfos:       recipientInfos,
@@ -319,7 +319,7 @@ func Encrypt(content []byte, recipients []*x509.Certificate) ([]byte, error) {
 	}
 
 	// Prepare outer payload structure
-	wrapper := contentInfo{
+	wrapper := ContentInfo{
 		ContentType: OIDEnvelopedData,
 		Content:     asn1.RawValue{Class: 2, Tag: 0, IsCompound: true, Bytes: innerContent},
 	}
@@ -330,7 +330,7 @@ func Encrypt(content []byte, recipients []*x509.Certificate) ([]byte, error) {
 // EncryptUsingPSK creates and returns an encrypted data PKCS7 structure,
 // encrypted using caller provided pre-shared secret.
 func EncryptUsingPSK(content []byte, key []byte) ([]byte, error) {
-	var eci *encryptedContentInfo
+	var eci *EncryptedContentInfo
 	var err error
 
 	if key == nil {
@@ -340,12 +340,12 @@ func EncryptUsingPSK(content []byte, key []byte) ([]byte, error) {
 	// Apply chosen symmetric encryption method
 	switch ContentEncryptionAlgorithm {
 	case EncryptionAlgorithmDESCBC:
-		_, eci, err = encryptDESCBC(content, key)
+		_, eci, err = EncryptDESCBC(content, key)
 
 	case EncryptionAlgorithmAES128GCM:
 		fallthrough
 	case EncryptionAlgorithmAES256GCM:
-		_, eci, err = encryptAESGCM(content, key)
+		_, eci, err = EncryptAESGCM(content, key)
 
 	default:
 		return nil, ErrUnsupportedEncryptionAlgorithm
@@ -356,7 +356,7 @@ func EncryptUsingPSK(content []byte, key []byte) ([]byte, error) {
 	}
 
 	// Prepare encrypted-data content
-	ed := encryptedData{
+	ed := EncryptedData{
 		Version:              0,
 		EncryptedContentInfo: *eci,
 	}
@@ -366,7 +366,7 @@ func EncryptUsingPSK(content []byte, key []byte) ([]byte, error) {
 	}
 
 	// Prepare outer payload structure
-	wrapper := contentInfo{
+	wrapper := ContentInfo{
 		ContentType: OIDEncryptedData,
 		Content:     asn1.RawValue{Class: 2, Tag: 0, IsCompound: true, Bytes: innerContent},
 	}
@@ -374,19 +374,19 @@ func EncryptUsingPSK(content []byte, key []byte) ([]byte, error) {
 	return asn1.Marshal(wrapper)
 }
 
-func marshalEncryptedContent(content []byte) asn1.RawValue {
+func MarshalEncryptedContent(content []byte) asn1.RawValue {
 	asn1Content, _ := asn1.Marshal(content)
 	return asn1.RawValue{Tag: 0, Class: 2, Bytes: asn1Content, IsCompound: true}
 }
 
-func encryptKey(key []byte, recipient *x509.Certificate) ([]byte, error) {
+func EncryptKey(key []byte, recipient *x509.Certificate) ([]byte, error) {
 	if pub := recipient.PublicKey.(*rsa.PublicKey); pub != nil {
 		return rsa.EncryptPKCS1v15(rand.Reader, pub, key)
 	}
 	return nil, ErrUnsupportedAlgorithm
 }
 
-func pad(data []byte, blocklen int) ([]byte, error) {
+func Pad(data []byte, blocklen int) ([]byte, error) {
 	if blocklen < 1 {
 		return nil, fmt.Errorf("invalid blocklen %d", blocklen)
 	}

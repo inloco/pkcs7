@@ -22,11 +22,11 @@ var ErrNotEncryptedContent = errors.New("pkcs7: content data is a decryptable da
 
 // Decrypt decrypts encrypted content info for recipient cert and private key
 func (p7 *PKCS7) Decrypt(cert *x509.Certificate, pkey crypto.PrivateKey) ([]byte, error) {
-	data, ok := p7.raw.(envelopedData)
+	data, ok := p7.raw.(EnvelopedData)
 	if !ok {
 		return nil, ErrNotEncryptedContent
 	}
-	recipient := selectRecipientForCertificate(data.RecipientInfos, cert)
+	recipient := SelectRecipientForCertificate(data.RecipientInfos, cert)
 	if recipient.EncryptedKey == nil {
 		return nil, errors.New("pkcs7: no enveloped recipient for provided certificate")
 	}
@@ -37,7 +37,7 @@ func (p7 *PKCS7) Decrypt(cert *x509.Certificate, pkey crypto.PrivateKey) ([]byte
 		if err != nil {
 			return nil, err
 		}
-		return data.EncryptedContentInfo.decrypt(contentKey)
+		return data.EncryptedContentInfo.Decrypt(contentKey)
 	}
 	return nil, ErrUnsupportedAlgorithm
 }
@@ -45,14 +45,14 @@ func (p7 *PKCS7) Decrypt(cert *x509.Certificate, pkey crypto.PrivateKey) ([]byte
 // DecryptUsingPSK decrypts encrypted data using caller provided
 // pre-shared secret
 func (p7 *PKCS7) DecryptUsingPSK(key []byte) ([]byte, error) {
-	data, ok := p7.raw.(encryptedData)
+	data, ok := p7.raw.(EncryptedData)
 	if !ok {
 		return nil, ErrNotEncryptedContent
 	}
-	return data.EncryptedContentInfo.decrypt(key)
+	return data.EncryptedContentInfo.Decrypt(key)
 }
 
-func (eci encryptedContentInfo) decrypt(key []byte) ([]byte, error) {
+func (eci EncryptedContentInfo) Decrypt(key []byte) ([]byte, error) {
 	alg := eci.ContentEncryptionAlgorithm.Algorithm
 	if !alg.Equal(OIDEncryptionAlgorithmDESCBC) &&
 		!alg.Equal(OIDEncryptionAlgorithmDESEDE3CBC) &&
@@ -139,13 +139,13 @@ func (eci encryptedContentInfo) decrypt(key []byte) ([]byte, error) {
 	mode := cipher.NewCBCDecrypter(block, iv)
 	plaintext := make([]byte, len(cyphertext))
 	mode.CryptBlocks(plaintext, cyphertext)
-	if plaintext, err = unpad(plaintext, mode.BlockSize()); err != nil {
+	if plaintext, err = Unpad(plaintext, mode.BlockSize()); err != nil {
 		return nil, err
 	}
 	return plaintext, nil
 }
 
-func unpad(data []byte, blocklen int) ([]byte, error) {
+func Unpad(data []byte, blocklen int) ([]byte, error) {
 	if blocklen < 1 {
 		return nil, fmt.Errorf("invalid blocklen %d", blocklen)
 	}
@@ -167,11 +167,11 @@ func unpad(data []byte, blocklen int) ([]byte, error) {
 	return data[:len(data)-padlen], nil
 }
 
-func selectRecipientForCertificate(recipients []recipientInfo, cert *x509.Certificate) recipientInfo {
+func SelectRecipientForCertificate(recipients []RecipientInfo, cert *x509.Certificate) RecipientInfo {
 	for _, recp := range recipients {
-		if isCertMatchForIssuerAndSerial(cert, recp.IssuerAndSerialNumber) {
+		if IsCertMatchForIssuerAndSerial(cert, recp.IssuerAndSerialNumber) {
 			return recp
 		}
 	}
-	return recipientInfo{}
+	return RecipientInfo{}
 }

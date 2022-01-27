@@ -31,7 +31,7 @@ func NewSignedData(data []byte) (*SignedData, error) {
 	if err != nil {
 		return nil, err
 	}
-	ci := contentInfo{
+	ci := ContentInfo{
 		ContentType: OIDData,
 		Content:     asn1.RawValue{Class: 2, Tag: 0, Bytes: content, IsCompound: true},
 	}
@@ -51,7 +51,7 @@ type SignerInfoConfig struct {
 type signedData struct {
 	Version                    int                        `asn1:"default:1"`
 	DigestAlgorithmIdentifiers []pkix.AlgorithmIdentifier `asn1:"set"`
-	ContentInfo                contentInfo
+	ContentInfo                ContentInfo
 	Certificates               rawCertificates        `asn1:"optional,tag:0"`
 	CRLs                       []pkix.CertificateList `asn1:"optional,tag:1"`
 	SignerInfos                []signerInfo           `asn1:"set"`
@@ -144,18 +144,18 @@ func (sd *SignedData) AddSignerChain(ee *x509.Certificate, pkey crypto.PrivateKe
 	sd.sd.DigestAlgorithmIdentifiers = append(sd.sd.DigestAlgorithmIdentifiers,
 		pkix.AlgorithmIdentifier{Algorithm: sd.digestOid},
 	)
-	hash, err := getHashForOID(sd.digestOid)
+	hash, err := GetHashForOID(sd.digestOid)
 	if err != nil {
 		return err
 	}
 	h := hash.New()
 	h.Write(sd.data)
 	sd.messageDigest = h.Sum(nil)
-	encryptionOid, err := getOIDForEncryptionAlgorithm(pkey, sd.digestOid)
+	encryptionOid, err := GetOIDForEncryptionAlgorithm(pkey, sd.digestOid)
 	if err != nil {
 		return err
 	}
-	attrs := &attributes{}
+	attrs := &Attributes{}
 	attrs.Add(OIDAttributeContentType, sd.sd.ContentInfo.ContentType)
 	attrs.Add(OIDAttributeMessageDigest, sd.messageDigest)
 	attrs.Add(OIDAttributeSigningTime, time.Now().UTC())
@@ -166,7 +166,7 @@ func (sd *SignedData) AddSignerChain(ee *x509.Certificate, pkey crypto.PrivateKe
 	if err != nil {
 		return err
 	}
-	unsignedAttrs := &attributes{}
+	unsignedAttrs := &Attributes{}
 	for _, attr := range config.ExtraUnsignedAttributes {
 		unsignedAttrs.Add(attr.Type, attr.Value)
 	}
@@ -206,7 +206,7 @@ func (sd *SignedData) AddSignerChain(ee *x509.Certificate, pkey crypto.PrivateKe
 func (sd *SignedData) SignWithoutAttr(ee *x509.Certificate, pkey crypto.PrivateKey, config SignerInfoConfig) error {
 	var signature []byte
 	sd.sd.DigestAlgorithmIdentifiers = append(sd.sd.DigestAlgorithmIdentifiers, pkix.AlgorithmIdentifier{Algorithm: sd.digestOid})
-	hash, err := getHashForOID(sd.digestOid)
+	hash, err := GetHashForOID(sd.digestOid)
 	if err != nil {
 		return err
 	}
@@ -242,7 +242,7 @@ func (sd *SignedData) SignWithoutAttr(ee *x509.Certificate, pkey crypto.PrivateK
 	if sd.encryptionOid == nil {
 		// if the encryption algorithm wasn't set by SetEncryptionAlgorithm,
 		// infer it from the digest algorithm
-		sd.encryptionOid, err = getOIDForEncryptionAlgorithm(pkey, sd.digestOid)
+		sd.encryptionOid, err = GetOIDForEncryptionAlgorithm(pkey, sd.digestOid)
 	}
 	if err != nil {
 		return err
@@ -261,7 +261,7 @@ func (sd *SignedData) SignWithoutAttr(ee *x509.Certificate, pkey crypto.PrivateK
 }
 
 func (si *signerInfo) SetUnauthenticatedAttributes(extraUnsignedAttrs []Attribute) error {
-	unsignedAttrs := &attributes{}
+	unsignedAttrs := &Attributes{}
 	for _, attr := range extraUnsignedAttrs {
 		unsignedAttrs.Add(attr.Type, attr.Value)
 	}
@@ -283,7 +283,7 @@ func (sd *SignedData) AddCertificate(cert *x509.Certificate) {
 // Detach removes content from the signed data struct to make it a detached signature.
 // This must be called right before Finish()
 func (sd *SignedData) Detach() {
-	sd.sd.ContentInfo = contentInfo{ContentType: OIDData}
+	sd.sd.ContentInfo = ContentInfo{ContentType: OIDData}
 }
 
 // GetSignedData returns the private Signed Data
@@ -298,7 +298,7 @@ func (sd *SignedData) Finish() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	outer := contentInfo{
+	outer := ContentInfo{
 		ContentType: OIDSignedData,
 		Content:     asn1.RawValue{Class: 2, Tag: 0, Bytes: inner, IsCompound: true},
 	}
@@ -410,7 +410,7 @@ func DegenerateCertificate(cert []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	emptyContent := contentInfo{ContentType: OIDData}
+	emptyContent := ContentInfo{ContentType: OIDData}
 	sd := signedData{
 		Version:      1,
 		ContentInfo:  emptyContent,
@@ -421,7 +421,7 @@ func DegenerateCertificate(cert []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	signedContent := contentInfo{
+	signedContent := ContentInfo{
 		ContentType: OIDSignedData,
 		Content:     asn1.RawValue{Class: 2, Tag: 0, Bytes: content, IsCompound: true},
 	}

@@ -70,7 +70,7 @@ func verifySignatureAtTime(p7 *PKCS7, signer signerInfo, truststore *x509.CertPo
 		if err != nil {
 			return err
 		}
-		hash, err := getHashForOID(signer.DigestAlgorithm.Algorithm)
+		hash, err := GetHashForOID(signer.DigestAlgorithm.Algorithm)
 		if err != nil {
 			return err
 		}
@@ -125,7 +125,7 @@ func verifySignature(p7 *PKCS7, signer signerInfo, truststore *x509.CertPool) (e
 		if err != nil {
 			return err
 		}
-		hash, err := getHashForOID(signer.DigestAlgorithm.Algorithm)
+		hash, err := GetHashForOID(signer.DigestAlgorithm.Algorithm)
 		if err != nil {
 			return err
 		}
@@ -325,7 +325,7 @@ func getSignatureAlgorithm(digestEncryption, digest pkix.AlgorithmIdentifier) (x
 
 func getCertFromCertsByIssuerAndSerial(certs []*x509.Certificate, ias issuerAndSerial) *x509.Certificate {
 	for _, cert := range certs {
-		if isCertMatchForIssuerAndSerial(cert, ias) {
+		if IsCertMatchForIssuerAndSerial(cert, ias) {
 			return cert
 		}
 	}
