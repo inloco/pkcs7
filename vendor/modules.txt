@@ -1,0 +1,4 @@
+# golang.org/x/crypto v0.33.0
+## explicit
+golang.org/x/crypto/cryptobyte
+golang.org/x/crypto/cryptobyte/asn1
