@@ -1,0 +1,17 @@
+name: 'Dependency Review'
+on: [ pull_request ]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  dependency-review:
+    runs-on: ci
+    steps:
+      - name: 'Checkout Repository'
+        uses: actions/checkout@v4
+      - name: 'Dependency Review'
+        uses: inloco/actions/dependency-review@HEAD
+        with:
+          audience: public
