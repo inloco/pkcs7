@@ -1,0 +1,15 @@
+{
+  "event": "security_override",
+  "timestamp": "2026-08-17T18:58:14.434908+00:00",
+  "user": "izabella.melo@incognia.com",
+  "branch": "update-dependencies",
+  "files": [
+    "verify_test.go",
+    "sign_test.go"
+  ],
+  "detectors": [
+    "Gitleaks: possible-raw-pii-email",
+    "Gitleaks: incognia-api-credentials"
+  ],
+  "secrets_found": 42
+}
