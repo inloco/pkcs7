@@ -1,5 +1,5 @@
 module github.com/inloco/pkcs7
 
-go 1.14
+go 1.26
 
-require golang.org/x/crypto v0.33.0
+require golang.org/x/crypto v0.52.0
