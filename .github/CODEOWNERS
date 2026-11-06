@@ -3,3 +3,6 @@
 
 
 * @inloco/sdk-codeowners
+
+/.github/CODEOWNERS @inloco/sre-codeowners
+/.github/workflows/agent-pr-review-guard.yaml @inloco/sre-codeowners
