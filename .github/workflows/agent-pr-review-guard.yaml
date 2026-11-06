@@ -1,0 +1,86 @@
+name: Agent PR Review Guard
+on:
+  pull_request_review:
+    types: [submitted, dismissed]
+  merge_group:
+    types: [checks_requested]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: agent-pr-review-guard-${{ github.event.pull_request.number || github.event.merge_group.head_sha }}
+  cancel-in-progress: true
+
+jobs:
+  evaluate:
+    name: Agent PR Review Guard
+    if: github.event_name != 'merge_group'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check human approvals
+        uses: actions/github-script@v8
+        with:
+          script: |
+              const { owner, repo } = context.repo;
+              const agentIds = [333783168];
+              const sha = context.payload.pull_request.head.sha;
+
+              async function agentPullRequestFromEvent() {
+                const { data: pr } = await github.rest.pulls.get({
+                  owner, repo, pull_number: context.payload.pull_request.number,
+                });
+                if (pr.head.sha !== sha) {
+                  throw new Error('The PR head changed; wait for the latest review check.');
+                }
+                return agentIds.includes(pr.user.id) ? pr : null;
+              }
+
+              async function canApprove(login) {
+                const { data } = await github.rest.repos.getCollaboratorPermissionLevel({
+                  owner, repo, username: login,
+                });
+                return ['admin', 'maintain', 'write'].includes(data.permission);
+              }
+
+              async function latestReviewsByUser(pr) {
+                const reviews = await github.paginate(github.rest.pulls.listReviews, {
+                  owner, repo, pull_number: pr.number, per_page: 100,
+                });
+                const latestReviews = new Map();
+                for (const review of reviews.sort((a, b) => a.id - b.id)) {
+                  if (!review.user || ['COMMENTED', 'PENDING'].includes(review.state)) {
+                    continue;
+                  }
+                  latestReviews.set(review.user.id, review);
+                }
+                return latestReviews;
+              }
+
+              async function humanApprovalCount(pr) {
+                const latestReviews = await latestReviewsByUser(pr);
+                let approvals = 0;
+                for (const review of latestReviews.values()) {
+                  if (review.state !== 'APPROVED' || review.commit_id !== pr.head.sha ||
+                      review.user.type !== 'User' || review.user.id === pr.user.id) {
+                    continue;
+                  }
+                  if (await canApprove(review.user.login)) {
+                    approvals++;
+                  }
+                }
+                return approvals;
+              }
+
+              const pr = await agentPullRequestFromEvent();
+              if (!pr) {
+                return;
+              }
+
+              const count = await humanApprovalCount(pr);
+              core.info(`PR #${pr.number}: ${count}/2 human approvals for ${pr.head.sha}`);
+              if (count < 2) {
+                core.setFailed(`At least 2 human approvals required on PR #${pr.number}.`);
+              }
